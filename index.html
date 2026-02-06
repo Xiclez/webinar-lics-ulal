@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <meta http-equiv="Content-Security-Policy" 
+          content="default-src 'self'; 
+                   script-src 'self' 'unsafe-inline' https://js.stripe.com https://player.vimeo.com https://va.vercel-scripts.com; 
+                   style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; 
+                   font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; 
+                   img-src 'self' https: data:; 
+                   frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://player.vimeo.com; 
+                   connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://m.stripe.network https://webinar-chatdb-ulal.vercel.app https://vitals.vercel-insights.com;">
+
+    <title>Webinar Exclusivo: Licenciaturas</title>
+    
+    <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+    <script defer src="/_vercel/insights/script.js"></script>
+
+    <script src="https://player.vimeo.com/api/player.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        /* --- ESTILOS BASE --- */
+        body, html { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: white; height: 100%; overflow-x: hidden; }
+        .main-container { display: flex; flex-direction: column; min-height: 100vh; }
+
+        #live-webinar {
+            width: 100%; max-width: 1600px; margin: 0 auto; flex-grow: 1; padding: 20px; box-sizing: border-box;
+            display: flex; flex-direction: row; align-items: flex-start; justify-content: center; gap: 20px;
+            position: relative; 
+        }
+        
+        .col-video { flex: 1; min-width: 0; display: flex; flex-direction: column; z-index: 10; transition: all 0.3s ease; }
+        
+        .video-wrapper { 
+            position: relative; width: 100%; border-radius: 12px; overflow: hidden; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); background: #000; 
+        }
+
+        .video-container { 
+            position: relative; 
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+            height: 0; 
+            overflow: hidden;
+            transition: all 0.5s ease; 
+        }
+        
+        .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+        
+        /* Controles */
+        .custom-controls { 
+            display: flex; justify-content: space-between; align-items: center; 
+            background-color: #111; padding: 12px 20px; border-top: 1px solid #333; 
+            position: relative; z-index: 20;
+        }
+        .btn-control { background: none; border: none; color: white; font-size: 1.1em; cursor: pointer; margin-right: 15px; }
+        .live-indicator { display: flex; align-items: center; font-weight: bold; font-size: 0.85em; padding: 5px 10px; border-radius: 4px; }
+        .live-indicator.is-live { color: #ff0000; cursor: default; }
+        .live-indicator.not-live { color: #888; background: rgba(255,255,255,0.1); cursor: pointer; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; background-color: currentColor; }
+
+        /* --- CHAT (PC) --- */
+        .col-chat {
+            width: 400px; flex-shrink: 0; height: 650px; display: flex; flex-direction: column;
+            background-color: #1e1e1e; border-radius: 12px; overflow: hidden; border: 1px solid #333;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            z-index: 15;
+        }
+        .chat-header { padding: 15px; background-color: #2a2a2a; border-bottom: 1px solid #333; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .chat-messages { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background-color: #1e1e1e; }
+        .chat-msg { font-size: 0.9em; line-height: 1.4; animation: fadeIn 0.3s ease; }
+        .chat-name { font-weight: bold; color: #888; margin-right: 5px; font-size: 0.85em; }
+        .chat-text { color: #ddd; word-wrap: break-word; }
+        .chat-msg.me .chat-name { color: #25D366; }
+        .chat-msg.me { background: rgba(37, 211, 102, 0.05); padding: 5px; border-radius: 5px; }
+        .chat-msg.admin .chat-name { color: #FFD700; }
+        .chat-input-area { padding: 15px; background-color: #2a2a2a; border-top: 1px solid #333; }
+        .chat-input-row { display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+        .chat-input { background: #111; border: 1px solid #444; color: white; padding: 8px 12px; border-radius: 20px; outline: none; font-size: 0.9em; width: 100%; box-sizing: border-box; }
+        .input-name { width: 40%; } .input-msg { flex-grow: 1; }
+        .btn-send { background: transparent; border: none; color: #25D366; font-size: 1.2em; cursor: pointer; padding: 0 10px; }
+
+        /* --- BOTONES ESPECÍFICOS --- */
+        #btn-fullscreen { display: inline-block; } 
+        #btn-toggle-chat-float { display: none; } 
+        #close-offer-immersive { display: none; } 
+
+        /* ==========================================================================
+           MODO INMERSIVO (FULLSCREEN / MOBILE)
+           ========================================================================== */
+        
+        body.is-immersive { overflow: hidden; }
+
+        body.is-immersive #live-webinar {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            margin: 0; padding: 0; max-width: none; background: #000;
+            z-index: 9999;
+            flex-direction: column;
+        }
+
+        body.is-immersive .col-video {
+            width: 100%; height: 100%; position: absolute; top: 0; left: 0;
+        }
+
+        body.is-immersive .video-wrapper {
+            width: 100%; height: 100%; border-radius: 0;
+            display: flex; flex-direction: column;
+        }
+
+        /* CROP DEL VIDEO */
+        body.is-immersive .video-container {
+            padding-bottom: 0; 
+            height: 100vh; 
+            width: 177.78vh; 
+            position: absolute;
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* CONTROLES FLOTANTES VISIBLES */
+        body.is-immersive .custom-controls {
+            position: fixed; 
+            bottom: 0; left: 0; width: 100%;
+            background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.5) 60%, transparent 100%);
+            border: none; 
+            padding: 15px 20px 35px 20px; 
+            z-index: 2147483647; 
+        }
+
+        /* CHAT FLOTANTE CON SCROLL */
+        body.is-immersive .col-chat {
+            position: absolute; bottom: 100px; 
+            left: 10px;
+            width: 85%; max-width: 350px; 
+            height: 35vh; 
+            background: transparent; border: none; border-radius: 0;
+            pointer-events: none; 
+            z-index: 2147483646;
+        }
+        
+        body.is-immersive .chat-header { display: none; }
+        
+        body.is-immersive .chat-messages {
+            background: transparent;
+            mask-image: linear-gradient(to bottom, transparent, black 15%);
+            -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%);
+            padding-bottom: 0; 
+            overflow-y: auto !important; 
+            pointer-events: auto !important; 
+            display: flex; flex-direction: column; justify-content: flex-end;
+            height: 100%; 
+        }
+        
+        body.is-immersive .chat-msg {
+            background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px);
+            border-radius: 12px; padding: 6px 10px; margin-bottom: 8px;
+            width: fit-content; color: white; text-shadow: 1px 1px 2px black;
+            pointer-events: auto; 
+        }
+        
+        body.is-immersive .chat-msg.me { background: rgba(37, 211, 102, 0.4); }
+        
+        body.is-immersive .chat-input-area { 
+            background: transparent; border: none; padding: 5px 0; 
+            pointer-events: auto; 
+        }
+        
+        body.is-immersive .chat-input { 
+            background: rgba(255,255,255,0.25); 
+            border: 1px solid rgba(255,255,255,0.4); 
+            backdrop-filter: blur(4px); 
+            color: white;
+        }
+        
+        body.is-immersive #btn-toggle-chat-float { display: inline-block; }
+        body.is-immersive .col-chat.chat-hidden { transform: translateX(-120%); opacity: 0; }
+        
+        /* Oferta Immersive */
+        body.is-immersive #offer-in-webinar { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            width: 90%; max-width: 400px; margin: 0; 
+            z-index: 2147483648; 
+            box-shadow: 0 0 50px rgba(0,0,0,0.8); 
+        }
+        
+        body.is-immersive #close-offer-immersive { display: block; }
+        body.is-immersive #offer-in-webinar.dismissed-fullscreen { display: none !important; }
+
+        /* Media Queries */
+        @media (max-width: 960px) {
+            body:not(.is-immersive) #live-webinar { flex-direction: column; padding: 10px; }
+            body:not(.is-immersive) .col-video { width: 100%; flex: none; }
+            body:not(.is-immersive) .col-chat { width: 100%; height: 500px; margin-top: 15px; }
+            body:not(.is-immersive) .input-name { width: 100% !important; margin-bottom: 8px; }
+        }
+
+        .hidden { display: none !important; }
+        
+        /* ESTILOS PRE/POST/STRIPE */
+        .state-section {
+            background-image: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url('https://ulalmexico.com/wp-content/uploads/2025/10/WhatsApp-Image-2025-08-16-at-12.20.07-PM-2.jpeg');
+            background-size: cover; background-position: center; flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;
+        }
+        .countdown-box { background: rgba(255, 255, 255, 0.1); padding: 20px 40px; border-radius: 15px; margin: 20px auto; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .timer-display { font-size: 2.5em; font-weight: 800; color: #FFD700; margin-top: 10px; }
+        .btn-action { display: inline-flex; align-items: center; padding: 15px 30px; border-radius: 50px; text-decoration: none; font-weight: bold; margin-top: 20px; font-size: 1.1em; cursor: pointer; transition: transform 0.2s; border: none; }
+        .btn-action:hover { transform: scale(1.05); }
+        .btn-whatsapp { background-color: #25D366; color: white; }
+        .btn-stripe-custom { background-color: #635bff; color: white; box-shadow: 0 4px 15px rgba(99, 91, 255, 0.4); }
+        .offer-24h-container { max-width: 600px; padding: 40px; background: #fff; color: #333; border-radius: 20px; text-align: center; }
+        .expired-container { max-width: 600px; padding: 40px; background: #2a2a2a; border-radius: 20px; border: 1px solid #444; }
+        
+        #offer-in-webinar { background-color: #fff; color: #333; padding: 25px; border-radius: 10px; margin-top: 20px; animation: slideUp 0.8s ease-out; border: 2px solid #635bff; }
+        #payment-form { width: 100%; min-height: 200px; opacity: 0; transition: opacity 0.5s; }
+        #payment-element { margin-bottom: 20px; min-height: 150px; }
+        #submit-payment { background: #635bff; color: white; border: 0; padding: 12px 24px; border-radius: 4px; width: 100%; font-size: 1em; cursor: pointer; font-weight: bold; }
+        #submit-payment:disabled { opacity: 0.6; }
+        #payment-success { color: #25D366; text-align: center; display: none; font-weight: bold; font-size: 1.2em; padding: 20px; }
+        #error-message { color: #df1b41; margin-top: 10px; font-size: 0.9em; text-align: center; }
+        .spinner { display: none; margin: 50px auto; border: 4px solid #f3f3f3; border-top: 4px solid #635bff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+
+<body>
+
+    <div class="main-container">
+        <div id="view-pre" class="state-section">
+            <h1>🎓 Licenciaturas: Tu Futuro Profesional</h1>
+            <div class="countdown-box">
+                <p>LA CLASE COMIENZA EN:</p>
+                <div id="timer-pre" class="timer-display">00d 00h 00m 00s</div>
+            </div>
+            <a href="#" class="btn-action btn-whatsapp" id="btn-wa-pre">Unirse al Grupo VIP</a>
+        </div>
+
+        <div id="view-live" class="hidden">
+            <div id="live-webinar">
+                <div class="col-video">
+                    <div class="video-wrapper">
+                        <div class="video-container">
+                            <iframe id="vimeo-player"
+                                src="https://player.vimeo.com/video/1162666345?title=0&byline=0&portrait=0&controls=0&playsinline=1" 
+                                allow="autoplay; fullscreen" allowfullscreen>
+                            </iframe>
+                        </div>
+                        
+                        <div class="custom-controls">
+                            <div>
+                                <button id="btn-play-pause" class="btn-control"><i class="fas fa-pause"></i></button>
+                                <button id="btn-volume" class="btn-control"><i class="fas fa-volume-mute"></i></button>
+                                <button id="btn-toggle-chat-float" class="btn-control"><i class="fas fa-comment-dots"></i></button>
+                            </div>
+                            
+                            <div style="display: flex; align-items: center;">
+                                <div id="btn-go-live" class="live-indicator is-live" style="margin-right: 15px;">
+                                    <span class="dot"></span> EN VIVO
+                                </div>
+                                <button id="btn-fullscreen" class="btn-control"><i class="fas fa-expand"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="offer-in-webinar" class="hidden">
+                        <div id="close-offer-immersive" style="text-align: right; margin-bottom: 5px;">
+                            <span onclick="dismissOfferFullscreen()" style="cursor:pointer; font-size:1.5em; color:#635bff; background: #f0f0f0; border-radius: 50%; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;">&times;</span>
+                        </div>
+                        <h3 style="margin: 0 0 15px 0; color: #635bff; text-align: center;">¡OFERTA LICENCIATURAS! ⚡</h3>
+                        <p style="text-align:center; color:#555; margin-bottom:20px;">INSCRIPCIÓN PRECIO ESPECIAL</p>
+                        <div id="loading-stripe" class="spinner"></div>
+                        <form id="payment-form">
+                            <div id="payment-element"></div>
+                            <button id="submit-payment">Pagar Inscripción</button>
+                            <div id="error-message"></div>
+                        </form>
+                        <div id="payment-success">
+                            <i class="fas fa-check-circle" style="font-size: 2em; margin-bottom:10px;"></i><br>
+                            ¡Pago Exitoso!<br>Revisa tu correo.
+                        </div>
+                        <p style="font-size:0.8em; margin-top:15px; color:#999; text-align: center;"><i class="fas fa-lock"></i> Pago Seguro Stripe</p>
+                    </div>
+                </div>
+
+                <div class="col-chat" id="chat-column">
+                    <div class="chat-header">
+                        <span>Chat Licenciaturas</span>
+                        <span style="font-size: 0.8em; color: #07f513;">• En línea</span>
+                    </div>
+                    <div class="chat-messages" id="chat-messages"></div>
+                    <div class="chat-input-area">
+                        <div class="chat-input-row">
+                            <input type="text" id="chat-name" class="chat-input input-name" placeholder="Tu Nombre">
+                            <input type="text" id="chat-msg" class="chat-input input-msg" placeholder="Escribe algo..." autocomplete="off">
+                            <button id="btn-send-chat" class="btn-send"><i class="fas fa-paper-plane"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-offer" class="state-section hidden">
+            <div class="offer-24h-container">
+                <h2>🔥 ¡Última Oportunidad!</h2>
+                <div class="countdown-box" style="background: #f0f0f0; border: 1px solid #ccc;">
+                    <p style="color:#333; margin:0;">LA OFERTA TERMINA EN:</p>
+                    <div id="timer-offer" class="timer-display" style="color: #d32f2f;">00:00:00</div>
+                </div>
+                <button class="btn-action btn-stripe-custom" onclick="openStripePopup()" style="width: 100%; justify-content: center;">
+                    💳 OBTENER BECA
+                </button>
+            </div>
+        </div>
+
+        <div id="view-expired" class="state-section hidden">
+            <div class="expired-container">
+                <h2>Oferta Expirada</h2>
+                <a href="#" class="btn-action btn-whatsapp" id="btn-wa-expired">Contactar Asesor</a>
+            </div>
+        </div>
+    </div>
+
+<script>
+    /* ================= CONFIGURACIÓN ================= */
+    const CONFIG = {
+        webinarDay: 5, // Viernes (ajustar si es necesario)
+        webinarHour: 19, 
+        webinarMinute: 0,
+        
+        videoDurationMin: 27, 
+        offerTimeMin: 26, 
+        offerTimeSec: 0,
+        
+        expiredDurationHours: 48,
+        offerPriceCents: 75000 
+    };
+    
+    const API_URL = "https://webinar-chatdb-ulal.vercel.app"; 
+    const STRIPE_PUBLIC_KEY = "pk_live_51S1s6FFeZjbCWU3HzsTFVHMreF7dudJZTCMO4KRMTL0PY1TTZscCpM5gbXUsudUrouxQBZ9WDANoP3uGXv2ZiUsd00ZSqalBjH";
+    const STRIPE_LINK = "https://buy.stripe.com/28E8wPegX5go22Q9MB3wQ03"; 
+    const WHATSAPP_LINK = "https://wppg.builderall.com/campaign/a8d3-9805/inviteatsapp.com/G9NJnrhjZIhA1sMtVEOV0a";
+
+    /* ================= FUNCIONES AUXILIARES ================= */
+    // SIN BOTS NI CHAT SCHEDULE
+    const fakeChatSchedule = []; 
+
+    /* ================= ESTADO Y VARIABLES ================= */
+    const views = { pre: document.getElementById('view-pre'), live: document.getElementById('view-live'), offer: document.getElementById('view-offer'), expired: document.getElementById('view-expired') };
+    const timers = { pre: document.getElementById('timer-pre'), offer: document.getElementById('timer-offer') };
+    const iframe = document.getElementById('vimeo-player');
+    const player = new Vimeo.Player(iframe);
+    
+    // Controles
+    const btnPlayPause = document.getElementById('btn-play-pause');
+    const btnGoLive = document.getElementById('btn-go-live');
+    const btnVolume = document.getElementById('btn-volume');
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+    const btnToggleChatFloat = document.getElementById('btn-toggle-chat-float');
+    const offerInWebinar = document.getElementById('offer-in-webinar');
+    const chatColumn = document.getElementById('chat-column');
+
+    let isUserSynced = true;
+    let theoreticalTime = 0;
+    let currentPhase = ""; 
+    let stripeElementsLoaded = false;
+    let isImmersive = false;
+    
+    // FIXES AUDIO
+    let ignoreSync = false; 
+    let isMuted = true; 
+
+    let seenMessageIds = new Set();
+    let chatInterval = null; 
+    let webinarStartTimeISO = null;
+
+    /* ================= LOGICA DISMISS OFERTA ================= */
+    window.dismissOfferFullscreen = function() {
+        offerInWebinar.classList.add('dismissed-fullscreen');
+    };
+
+    /* ================= LOGICA FULLSCREEN ================= */
+    btnFullscreen.addEventListener('click', toggleImmersive);
+    function toggleImmersive() {
+        isImmersive = !isImmersive;
+        if (isImmersive) {
+            document.body.classList.add('is-immersive');
+            btnFullscreen.innerHTML = '<i class="fas fa-compress"></i>';
+            if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{});
+        } else {
+            document.body.classList.remove('is-immersive');
+            btnFullscreen.innerHTML = '<i class="fas fa-expand"></i>';
+            if(document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+        }
+    }
+    btnToggleChatFloat.addEventListener('click', () => { chatColumn.classList.toggle('chat-hidden'); });
+    
+    let touchStartX = 0;
+    chatColumn.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, {passive: true});
+    chatColumn.addEventListener('touchend', e => {
+        if (!isImmersive) return;
+        if (e.changedTouches[0].screenX < touchStartX - 50) chatColumn.classList.add('chat-hidden');
+    }, {passive: true});
+
+    /* ================= CORE LOOP & TIME CALC (RESTORED) ================= */
+    function getCycleTimes() {
+        const now = new Date();
+        const start = new Date();
+        start.setHours(CONFIG.webinarHour, CONFIG.webinarMinute, 0, 0);
+        let dayDiff = CONFIG.webinarDay - now.getDay();
+        start.setDate(now.getDate() + dayDiff);
+        
+        const durationMs = CONFIG.videoDurationMin * 60 * 1000;
+        const offerDurationMs = 24 * 60 * 60 * 1000; // 24 horas
+        const expiredDurationMs = CONFIG.expiredDurationHours * 60 * 60 * 1000; // 48 horas
+
+        let endWebinar = new Date(start.getTime() + durationMs);
+        let endOffer = new Date(endWebinar.getTime() + offerDurationMs);
+        let endExpired = new Date(endOffer.getTime() + expiredDurationMs);
+
+        if (now > endExpired) {
+            start.setDate(start.getDate() + 7);
+            endWebinar = new Date(start.getTime() + durationMs);
+            endOffer = new Date(endWebinar.getTime() + offerDurationMs);
+            endExpired = new Date(endOffer.getTime() + expiredDurationMs);
+        } else if (dayDiff > 0) {
+             const previousStart = new Date(start);
+             previousStart.setDate(start.getDate() - 7);
+             const prevEndExpired = new Date(previousStart.getTime() + durationMs + offerDurationMs + expiredDurationMs);
+             
+             if (now < prevEndExpired) {
+                 return { start: previousStart, endWebinar: new Date(previousStart.getTime() + durationMs), endOffer: new Date(previousStart.getTime() + durationMs + offerDurationMs), endExpired: prevEndExpired };
+             }
+        }
+        
+        return { start, endWebinar, endOffer, endExpired };
+    }
+
+    function switchView(viewName) {
+        Object.values(views).forEach(el => el.classList.add('hidden'));
+        if(views[viewName]) views[viewName].classList.remove('hidden');
+        if (viewName !== 'live') player.getPaused().then(paused => { if(!paused) player.pause(); });
+        else { player.setVolume(0); player.play().catch(e => console.log("Autoplay blocked")); }
+        fetch(`${API_URL}/track-visitor`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ page: viewName, userAgent: navigator.userAgent }) }).catch(e=>{});
+    }
+
+    function updateTimer(element, targetDate) {
+        const diff = targetDate - new Date();
+        if (diff <= 0) { element.innerText = "00:00:00"; return; }
+        const d = Math.floor(diff/86400000); const h = Math.floor((diff%86400000)/3600000); 
+        const m = Math.floor((diff%3600000)/60000); const s = Math.floor((diff%60000)/1000);
+        element.innerText = d>0 ? `${d}d ${h}h ${m}m ${s}s` : `${h}h ${m}m ${s}s`;
+    }
+
+    function masterLoop() {
+        const now = new Date();
+        const cycle = getCycleTimes();
+        let newState = "";
+        
+        if (now < cycle.start) { newState = "pre"; updateTimer(timers.pre, cycle.start); }
+        else if (now >= cycle.start && now < cycle.endWebinar) { newState = "live"; theoreticalTime = (now - cycle.start) / 1000; }
+        else if (now >= cycle.endWebinar && now < cycle.endOffer) { newState = "offer"; updateTimer(timers.offer, cycle.endOffer); }
+        else { newState = "expired"; }
+
+        if (newState !== currentPhase) {
+            currentPhase = newState;
+            switchView(currentPhase);
+            if (currentPhase === 'live') { isUserSynced = true; startChatPolling(cycle.start.toISOString()); } else stopChatPolling();
+        }
+
+        if (currentPhase === 'live') {
+            if (isUserSynced && !ignoreSync) {
+                player.getCurrentTime().then(seconds => { 
+                    if (Math.abs(seconds - theoreticalTime) > 15) { 
+                        player.setCurrentTime(theoreticalTime).catch(()=>{}); 
+                    }
+                });
+                updateLiveButton(true);
+            } else updateLiveButton(false);
+            
+            // OFERTA
+            const offerTrigger = (CONFIG.offerTimeMin * 60) + CONFIG.offerTimeSec;
+            if (theoreticalTime > offerTrigger) {
+                offerInWebinar.classList.remove('hidden'); 
+                if (!stripeElementsLoaded) { stripeElementsLoaded = true; loadStripeAndMount(); }
+            } else {
+                offerInWebinar.classList.add('hidden');
+            }
+        }
+    }
+
+    /* ================= STRIPE & CHAT ================= */
+    async function loadStripeAndMount() {
+        document.getElementById('loading-stripe').style.display = 'block';
+        try {
+            if(!window.Stripe) { const s=document.createElement('script');s.src='https://js.stripe.com/v3/';document.head.appendChild(s);await new Promise(r=>s.onload=r); }
+            const stripe = Stripe(STRIPE_PUBLIC_KEY);
+            const res = await fetch(`${API_URL}/create-payment-intent`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: CONFIG.offerPriceCents }) });
+            const { clientSecret } = await res.json();
+            const elements = stripe.elements({ appearance: { theme: 'stripe' }, clientSecret });
+            const pe = elements.create("payment"); pe.mount("#payment-element");
+            document.getElementById('loading-stripe').style.display = 'none'; document.getElementById('payment-form').style.opacity = '1';
+
+            document.getElementById("payment-form").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById("submit-payment"); btn.disabled = true; btn.textContent = "Procesando...";
+                const { error } = await stripe.confirmPayment({ elements, confirmParams: { return_url: window.location.href }, redirect: "if_required" });
+                if (error) { document.getElementById("error-message").textContent = error.message; btn.disabled = false; }
+                else { document.getElementById('payment-form').style.display='none'; document.getElementById('payment-success').style.display='block'; }
+            });
+        } catch (err) { console.error(err); }
+    }
+    window.openStripePopup = function() { window.open(STRIPE_LINK, 'PagarBeca', `width=500,height=700`); };
+
+    /* ================= EVENTOS PLAYER ================= */
+    function updateLiveButton(isLive) {
+        if (isLive) { btnGoLive.className = "live-indicator is-live"; btnGoLive.innerHTML = '<span class="dot"></span> EN VIVO'; }
+        else { btnGoLive.className = "live-indicator not-live"; btnGoLive.innerHTML = '<span class="dot"></span> VOLVER AL VIVO'; }
+    }
+    
+    btnPlayPause.addEventListener('click', () => { player.getPaused().then(paused => { if (paused) { player.play(); btnPlayPause.innerHTML='<i class="fas fa-pause"></i>'; } else { player.pause(); btnPlayPause.innerHTML='<i class="fas fa-play"></i>'; isUserSynced = false; } }); });
+    
+    btnVolume.addEventListener('click', () => {
+        ignoreSync = true;
+        setTimeout(() => { ignoreSync = false; }, 10000); 
+        player.setVolume(1).catch(()=>{});
+        
+        if (isMuted) {
+            player.setMuted(false).then(() => {
+                player.getPaused().then(paused => { if(paused) player.play(); });
+            }).catch(()=>{});
+            btnVolume.innerHTML='<i class="fas fa-volume-up"></i>';
+            isMuted = false;
+        } else {
+            player.setMuted(true).catch(()=>{});
+            btnVolume.innerHTML='<i class="fas fa-volume-mute"></i>';
+            isMuted = true;
+        }
+    });
+
+    btnGoLive.addEventListener('click', () => { if (!isUserSynced) { player.setCurrentTime(theoreticalTime); player.play(); isUserSynced = true; btnPlayPause.innerHTML='<i class="fas fa-pause"></i>'; } });
+    
+    document.getElementById('btn-wa-pre').href = WHATSAPP_LINK; document.getElementById('btn-wa-expired').href = WHATSAPP_LINK;
+
+    /* ================= CHAT LOGIC (ENDPOINT LICENCIATURAS) ================= */
+    const chatMessagesDiv = document.getElementById('chat-messages');
+    const nameInput = document.getElementById('chat-name');
+    const msgInput = document.getElementById('chat-msg');
+    const btnSend = document.getElementById('btn-send-chat');
+
+    function appendMessage(name, text, isMe = false, isAdmin = false) {
+        const div = document.createElement('div');
+        div.className = `chat-msg ${isMe ? 'me' : ''} ${isAdmin ? 'admin' : ''}`;
+        div.innerHTML = `<span class="chat-name">${name}:</span><span class="chat-text">${text}</span>`;
+        chatMessagesDiv.appendChild(div); chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    }
+    
+    function startChatPolling(startTimeISO) {
+        webinarStartTimeISO = startTimeISO; chatMessagesDiv.innerHTML = ''; seenMessageIds.clear();
+        appendMessage('Moderador', '¡Bienvenidos al Webinar de Licenciaturas! 👇', false, true);
+        fetchMessages(); 
+        if (chatInterval) clearInterval(chatInterval); 
+        chatInterval = setInterval(fetchMessages, 2500);
+    }
+    function stopChatPolling() { if (chatInterval) clearInterval(chatInterval); }
+    
+    async function fetchMessages() {
+        if (!webinarStartTimeISO) return;
+        try {
+            // NOTA: Endpoint nuevo
+            const response = await fetch(`${API_URL}/chat-lic?since=${webinarStartTimeISO}`);
+            const messages = await response.json();
+            messages.forEach(msg => {
+                if (!seenMessageIds.has(msg._id)) {
+                    appendMessage(msg.name, msg.text, msg.name === (nameInput.value.trim() || "Anónimo"));
+                    seenMessageIds.add(msg._id);
+                }
+            });
+        } catch (e) {}
+    }
+    
+    async function sendMessage() {
+        const text = msgInput.value.trim(); if (!text) return;
+        const name = nameInput.value.trim() || "Anónimo";
+        
+        msgInput.value = "";
+        
+        try { 
+            // NOTA: Endpoint nuevo
+            await fetch(`${API_URL}/chat-lic`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, text }) }); 
+            fetchMessages(); 
+        } catch (e) {}
+    }
+    btnSend.addEventListener('click', sendMessage);
+    msgInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMessage(); });
+
+    setInterval(masterLoop, 1000); masterLoop();
+</script>
+</body>
+</html>
