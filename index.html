@@ -248,7 +248,7 @@
                     <div class="video-wrapper">
                         <div class="video-container">
                             <iframe id="vimeo-player"
-                                src="https://player.vimeo.com/video/1162666345?title=0&byline=0&portrait=0&controls=0&playsinline=1" 
+                                src="https://player.vimeo.com/video/1168981936?title=0&byline=0&portrait=0&controls=0&playsinline=1" 
                                 allow="autoplay; fullscreen" allowfullscreen>
                             </iframe>
                         </div>
@@ -313,8 +313,14 @@
                     <p style="color:#333; margin:0;">LA OFERTA TERMINA EN:</p>
                     <div id="timer-offer" class="timer-display" style="color: #d32f2f;">00:00:00</div>
                 </div>
-                <button class="btn-action btn-stripe-custom" onclick="openStripePopup()" style="width: 100%; justify-content: center;">
-                    💳 OBTENER BECA
+                
+                <select id="payment-plan-select" style="width: 100%; padding: 15px; margin-top: 20px; border-radius: 8px; border: 2px solid #635bff; font-size: 1.1em; font-weight: bold; color: #333; outline: none; cursor: pointer; appearance: auto; background-color: #fff;">
+                    <option value="media_beca">Media Beca ($750 Inscripción)</option>
+                    <option value="pago_unico">Pago Único ($5,999 Total Final)</option>
+                </select>
+
+                <button class="btn-action btn-stripe-custom" onclick="openStripePopup()" style="width: 100%; justify-content: center; margin-top: 15px;">
+                    💳 CONTINUAR AL PAGO
                 </button>
             </div>
         </div>
@@ -334,8 +340,8 @@
         webinarHour: 19, 
         webinarMinute: 15,
         
-        videoDurationMin: 27, 
-        offerTimeMin: 26, 
+        videoDurationMin: 30, 
+        offerTimeMin: 25, 
         offerTimeSec: 0,
         
         expiredDurationHours: 48,
@@ -344,7 +350,9 @@
     
     const API_URL = "https://webinar-chatdb-ulal.vercel.app"; 
     const STRIPE_PUBLIC_KEY = "pk_live_51S1s6FFeZjbCWU3HzsTFVHMreF7dudJZTCMO4KRMTL0PY1TTZscCpM5gbXUsudUrouxQBZ9WDANoP3uGXv2ZiUsd00ZSqalBjH";
-    const STRIPE_LINK = "https://buy.stripe.com/28E8wPegX5go22Q9MB3wQ03"; 
+    const STRIPE_LINK = "https://buy.stripe.com/bJe7sLc8P4ckcHu9MB3wQ04"; 
+    const STRIPE_LINK_MEDIA_BECA = "https://buy.stripe.com/bJe7sLc8P4ckcHu9MB3wQ04"; 
+    const STRIPE_LINK_PAGO_UNICO = "https://buy.stripe.com/7sY14n8WDcIQcHu6Ap3wQ05";
     const WHATSAPP_LINK = "https://wa.link/w0jm04";
 
     /* ================= FUNCIONES AUXILIARES ================= */
@@ -547,8 +555,13 @@
             });
         } catch (err) { console.error(err); }
     }
-    window.openStripePopup = function() { window.open(STRIPE_LINK, 'PagarBeca', `width=500,height=700`); };
-
+window.openStripePopup = function() { 
+        const selectPlan = document.getElementById('payment-plan-select');
+        // Identificar qué plan eligió el usuario
+        const linkToOpen = (selectPlan && selectPlan.value === 'pago_unico') ? STRIPE_LINK_PAGO_UNICO : STRIPE_LINK_MEDIA_BECA;
+        
+        window.open(linkToOpen, 'PagarBeca', `width=500,height=700`); 
+    };
     /* ================= EVENTOS PLAYER ================= */
     function updateLiveButton(isLive) {
         if (isLive) { btnGoLive.className = "live-indicator is-live"; btnGoLive.innerHTML = '<span class="dot"></span> EN VIVO'; }
