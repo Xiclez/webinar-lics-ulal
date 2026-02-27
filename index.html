@@ -11,7 +11,7 @@
                    font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; 
                    img-src 'self' https: data:; 
                    frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://player.vimeo.com; 
-                   connect-src 'self' https://api.stripe.com https://maps.googleapis.com https://m.stripe.network https://webinar-chatdb-ulal.vercel.app https://vitals.vercel-insights.com;">
+                   connect-src 'self' https://worldtimeapi.org https://api.stripe.com https://maps.googleapis.com https://m.stripe.network https://webinar-chatdb-ulal.vercel.app https://vitals.vercel-insights.com;">
 
     <title>Webinar Exclusivo: Licenciaturas</title>
     
@@ -232,11 +232,14 @@
     <div class="main-container">
         <div id="view-pre" class="state-section">
             <h1>🎓 Licenciaturas: Tu Futuro Profesional</h1>
-            <div class="countdown-box">
+            <div class="countdown-box" id="loader-sync">
+                <p style="color: #FFD700; margin: 0;"><i class="fas fa-spinner fa-spin"></i> Sincronizando Servidor...</p>
+            </div>
+            <div class="countdown-box hidden" id="box-timer-pre">
                 <p>LA CLASE COMIENZA EN:</p>
                 <div id="timer-pre" class="timer-display">00d 00h 00m 00s</div>
             </div>
-             <a href="#" class="btn-action btn-whatsapp" id="btn-wa-pre">Unirse al Grupo VIP</a> 
+            <a href="#" class="btn-action btn-whatsapp" id="btn-wa-pre">Unirse al Grupo VIP</a>
         </div>
 
         <div id="view-live" class="hidden">
@@ -377,6 +380,35 @@
     let chatInterval = null; 
     let webinarStartTimeISO = null;
 
+    /* ================= NUEVO: SISTEMA DE TIEMPO DEL SERVIDOR ================= */
+    let serverTimeOffset = 0; 
+    let isTimeSynced = false;
+
+    async function syncServerTime() {
+        try {
+            // Le pedimos la hora a tu propia API en Vercel
+            const response = await fetch(`${API_URL}/time`);
+            if(!response.ok) throw new Error("Error en tu API de tiempo");
+            const data = await response.json();
+            
+            // data.serverTime ya viene en milisegundos UTC
+            serverTimeOffset = data.serverTime - Date.now();
+            console.log("⏰ Tiempo sincronizado desde Vercel. Desfase de PC:", serverTimeOffset, "ms");
+        } catch (error) {
+            console.warn("⚠️ Falló sincronización. Usando reloj local.", error);
+            serverTimeOffset = 0; 
+        }
+        isTimeSynced = true;
+        document.getElementById('loader-sync').classList.add('hidden');
+        document.getElementById('box-timer-pre').classList.remove('hidden');
+    }
+
+    function getChihuahuaTime() {
+        const currentRealUTC = Date.now() + serverTimeOffset;
+        const chihuahuaOffsetMs = -6 * 60 * 60 * 1000; // GMT-6
+        return new Date(currentRealUTC + chihuahuaOffsetMs);
+    }
+
     /* ================= LOGICA DISMISS OFERTA ================= */
     window.dismissOfferFullscreen = function() {
         offerInWebinar.classList.add('dismissed-fullscreen');
@@ -407,35 +439,34 @@
 
     /* ================= CORE LOOP & TIME CALC (RESTORED) ================= */
     function getCycleTimes() {
-        const now = new Date();
-        const start = new Date();
-        start.setHours(CONFIG.webinarHour, CONFIG.webinarMinute, 0, 0);
-        let dayDiff = CONFIG.webinarDay - now.getDay();
-        start.setDate(now.getDate() + dayDiff);
+        const now = getChihuahuaTime();
+        const start = getChihuahuaTime();
+        
+        start.setUTCHours(CONFIG.webinarHour, CONFIG.webinarMinute, 0, 0);
+        let dayDiff = CONFIG.webinarDay - now.getUTCDay();
+        start.setUTCDate(now.getUTCDate() + dayDiff);
         
         const durationMs = CONFIG.videoDurationMin * 60 * 1000;
-        const offerDurationMs = 24 * 60 * 60 * 1000; // 24 horas
-        const expiredDurationMs = CONFIG.expiredDurationHours * 60 * 60 * 1000; // 48 horas
+        const offerDurationMs = 24 * 60 * 60 * 1000; 
+        const expiredDurationMs = CONFIG.expiredDurationHours * 60 * 60 * 1000;
 
         let endWebinar = new Date(start.getTime() + durationMs);
         let endOffer = new Date(endWebinar.getTime() + offerDurationMs);
         let endExpired = new Date(endOffer.getTime() + expiredDurationMs);
 
-        if (now > endExpired) {
-            start.setDate(start.getDate() + 7);
+        if (now.getTime() > endExpired.getTime()) {
+            start.setUTCDate(start.getUTCDate() + 7);
             endWebinar = new Date(start.getTime() + durationMs);
             endOffer = new Date(endWebinar.getTime() + offerDurationMs);
             endExpired = new Date(endOffer.getTime() + expiredDurationMs);
         } else if (dayDiff > 0) {
-             const previousStart = new Date(start);
-             previousStart.setDate(start.getDate() - 7);
+             const previousStart = new Date(start.getTime());
+             previousStart.setUTCDate(start.getUTCDate() - 7);
              const prevEndExpired = new Date(previousStart.getTime() + durationMs + offerDurationMs + expiredDurationMs);
-             
-             if (now < prevEndExpired) {
+             if (now.getTime() < prevEndExpired.getTime()) {
                  return { start: previousStart, endWebinar: new Date(previousStart.getTime() + durationMs), endOffer: new Date(previousStart.getTime() + durationMs + offerDurationMs), endExpired: prevEndExpired };
              }
         }
-        
         return { start, endWebinar, endOffer, endExpired };
     }
 
@@ -448,7 +479,8 @@
     }
 
     function updateTimer(element, targetDate) {
-        const diff = targetDate - new Date();
+        const now = getChihuahuaTime();
+        const diff = targetDate.getTime() - now.getTime();
         if (diff <= 0) { element.innerText = "00:00:00"; return; }
         const d = Math.floor(diff/86400000); const h = Math.floor((diff%86400000)/3600000); 
         const m = Math.floor((diff%3600000)/60000); const s = Math.floor((diff%60000)/1000);
@@ -456,13 +488,15 @@
     }
 
     function masterLoop() {
-        const now = new Date();
+        if (!isTimeSynced) return;
+        
+        const now = getChihuahuaTime();
         const cycle = getCycleTimes();
         let newState = "";
         
-        if (now < cycle.start) { newState = "pre"; updateTimer(timers.pre, cycle.start); }
-        else if (now >= cycle.start && now < cycle.endWebinar) { newState = "live"; theoreticalTime = (now - cycle.start) / 1000; }
-        else if (now >= cycle.endWebinar && now < cycle.endOffer) { newState = "offer"; updateTimer(timers.offer, cycle.endOffer); }
+        if (now.getTime() < cycle.start.getTime()) { newState = "pre"; updateTimer(timers.pre, cycle.start); }
+        else if (now.getTime() >= cycle.start.getTime() && now.getTime() < cycle.endWebinar.getTime()) { newState = "live"; theoreticalTime = (now.getTime() - cycle.start.getTime()) / 1000; }
+        else if (now.getTime() >= cycle.endWebinar.getTime() && now.getTime() < cycle.endOffer.getTime()) { newState = "offer"; updateTimer(timers.offer, cycle.endOffer); }
         else { newState = "expired"; }
 
         if (newState !== currentPhase) {
@@ -594,10 +628,14 @@
             fetchMessages(); 
         } catch (e) {}
     }
-    btnSend.addEventListener('click', sendMessage);
+btnSend.addEventListener('click', sendMessage);
     msgInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMessage(); });
 
-    setInterval(masterLoop, 1000); masterLoop();
+    // Inicialización de la Sincronización
+    syncServerTime().then(() => {
+        setInterval(masterLoop, 1000); 
+        masterLoop();
+    });
 </script>
 </body>
 </html>
